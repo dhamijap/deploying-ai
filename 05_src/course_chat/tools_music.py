@@ -15,7 +15,7 @@ load_dotenv(".secrets")
 
 vector_db_client_url="http://localhost:8000"
 chroma = chromadb.HttpClient(host=vector_db_client_url)
-collection = chroma.get_collection(name="pitchfork_reviews", 
+collection = chroma.get_or_create_collection(name="pitchfork_reviews", 
                                    embedding_function=OpenAIEmbeddingFunction(
                                        api_key = os.getenv("OPENAI_API_KEY"),
                                        model_name="text-embedding-3-small")
