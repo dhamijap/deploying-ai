@@ -73,9 +73,9 @@ def call_model(state: MessagesState):
     
     # DEBUG: Print what's happening
     print(f"\n{'='*60}")
-    print(f"🔄 call_model invoked")
-    print(f"📊 Total messages in state: {len(state['messages'])}")
-    print(f"📝 Last message: {state['messages'][-1].content[:80]}...")
+    print(f"call_model invoked")
+    print(f"Total messages in state: {len(state['messages'])}")
+    print(f"Last message: {state['messages'][-1].content[:80]}...")
     print(f"{'='*60}\n")
     ### end of debug code   
 
