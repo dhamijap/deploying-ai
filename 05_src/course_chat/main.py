@@ -20,9 +20,22 @@ load_dotenv(".env")
 load_dotenv(".secrets")
 
 
-chat_agent = init_chat_model(
-    "openai:gpt-4o-mini",
+# chat_agent = init_chat_model(
+#     "openai:gpt-4o-mini",
+#     api_key=os.getenv("OPENAI_API_KEY"),  # Your tunneled key
+#     base_url=os.getenv('https://k7uffyg03f.execute-api.us-east-1.amazonaws.com/prod/openai/v1'),  # Your AWS tunnel endpoint
+# )
+
+from langchain_openai import ChatOpenAI
+
+chat_agent = ChatOpenAI(
+    model="gpt-4o-mini",
+    openai_api_key="dummy",
+    openai_api_base="https://k7uffyg03f.execute-api.us-east-1.amazonaws.com/prod/openai/v1",
+    default_headers={"x-api-key": os.getenv('API_GATEWAY_KEY')}
 )
+
+
 tools = [get_cat_facts, get_dog_facts, recommend_albums, get_horoscope]
 
 instructions = return_instructions()
@@ -51,3 +64,40 @@ def get_graph():
     graph = builder.compile()
     return graph
 
+import gradio as gr
+
+def chat_interface(message, history):
+    """Gradio chat function"""
+    graph = get_graph()
+    
+    # Convert Gradio history to LangGraph messages
+    messages = []
+    for human, assistant in history:
+        messages.append(HumanMessage(content=human))
+        if assistant:
+            messages.append({"role": "assistant", "content": assistant})
+    
+    # Add current message
+    messages.append(HumanMessage(content=message))
+    
+    # Invoke the graph
+    result = graph.invoke({"messages": messages})
+    
+    # Return the assistant's response
+    return result["messages"][-1].content
+
+if __name__ == "__main__":
+    demo = gr.ChatInterface(
+        fn=chat_interface,
+        title="Course Chat Agent",
+        description="Chat with an AI assistant that can tell you cat/dog facts, recommend music, and share horoscopes!",
+        examples=[
+            "Tell me a cat fact",
+            "What's my horoscope for Aries?",
+            "Recommend some albums",
+            "Give me a dog fact"
+        ],
+        theme=gr.themes.Soft(),
+    )
+    
+    demo.launch()
