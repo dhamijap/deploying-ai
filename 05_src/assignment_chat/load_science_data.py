@@ -1,52 +1,64 @@
 from bs4 import BeautifulSoup
 import chromadb
 import os
+import time
 
 def load_science_facts():
-    """Load science misconceptions into ChromaDB"""
+    """Load science misconceptions into a local ChromaDB persistent store"""
     
-    print("Loading science misconceptions into ChromaDB...")
+    print("\n--- Starting Science Data Load ---")
     
-    # Get the directory where this script is located
-    script_dir = os.path.dirname(__file__)
-    print(f"Script directory: {script_dir}")
-    
-    # Build the path to the HTML file
+    # 1. FIXED PATHING: Always relative to THIS file
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    db_path = os.path.join(script_dir, "chroma_db")
     html_path = os.path.join(script_dir, "List of common misconceptions about science.htm")
-    print(f"Looking for HTML at: {html_path}")
     
-    # Check if file exists
-    file_exists = os.path.exists(html_path)
-    print(f"File exists: {file_exists}")
+    print(f"Target Database: {db_path}")
     
-    if not file_exists:
-        # List files to debug
-        files_in_dir = os.listdir(script_dir)
-        print(f"Files in directory: {files_in_dir}")
-        print(f"ERROR: HTML file not found!")
+    # 2. Check for HTML source
+    if not os.path.exists(html_path):
+        print(f"ERROR: HTML file not found at {html_path}")
         return False
     
-    # Parse HTML
-    print("Parsing HTML...")
+    # 3. Parse HTML
     with open(html_path, "r", encoding="utf-8", errors="ignore") as f:
         soup = BeautifulSoup(f.read(), "html.parser")
     
-    texts = [p.get_text().strip() for p in soup.find_all("p") if len(p.get_text()) > 5]
-    print(f"Extracted {len(texts)} text chunks")
+    # Extract paragraphs and list items
+    texts = [p.get_text().strip() for p in soup.find_all(["p", "li"]) if len(p.get_text().strip()) > 20]
+    print(f"Extracted {len(texts)} text chunks.")
     
-    # Load to ChromaDB
-    print("Loading into ChromaDB...")
-    chroma = chromadb.HttpClient(host="http://localhost:8000")
+    if len(texts) == 0:
+        print("ERROR: No text extracted. Check your HTML parsing logic.")
+        return False
+
+    # 4. Initialize Chroma (Persistent Mode)
+    client = chromadb.PersistentClient(path=db_path)
     
+    # Wipe old collection to ensure a clean 'bake'
     try:
-        chroma.delete_collection("science_facts")
+        client.delete_collection("science_facts")
+        print("Old collection cleared.")
     except:
         pass
     
-    collection = chroma.get_or_create_collection("science_facts")
+    collection = client.create_collection("science_facts")
     
-    for i, text in enumerate(texts):
-        collection.add(documents=[text], ids=[f"science_{i}"])
+    # 5. Add Documents
+    print("Embedding data... please wait.")
+    collection.add(
+        documents=texts,
+        ids=[f"science_{i}" for i in range(len(texts))]
+    )
     
-    print(f"Success! Loaded {collection.count()} science facts and misconceptions")
+    # 6. VERIFY & FLUSH
+    final_count = collection.count()
+    print(f"SUCCESS: {final_count} facts baked into {db_path}")
+    
+    # Small pause to ensure Windows finishes file writing
+    time.sleep(1)
     return True
+
+# This allows you to run the script directly from your terminal
+if __name__ == "__main__":
+    load_science_facts()

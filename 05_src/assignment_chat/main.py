@@ -10,76 +10,49 @@ from langgraph.prebuilt.tool_node import ToolNode, tools_condition
 from langchain_core.messages import AIMessage, SystemMessage,  HumanMessage
 
 from dotenv import load_dotenv
-import json
-import requests
 import os
 
 from assignment_chat import tools_game_deals
 from assignment_chat.prompts import return_instructions
 from assignment_chat.tools_advice import get_advice
-from assignment_chat.tools_music import recommend_albums
 from assignment_chat.tools_game_deals import recommend_game
 from utils.logger import get_logger
 from langchain_openai import ChatOpenAI
-
 
 _logs = get_logger(__name__)
 load_dotenv(".env")
 load_dotenv(".secrets")
 
-# from langchain_google_genai import ChatGoogleGenerativeAI
-# import google.generativeai as genai
-
-
-# USE_GEMINI = True
-
-# if USE_GEMINI:
-#     from langchain_google_genai import ChatGoogleGenerativeAI
-#     print("Open AI not working - using Google Gemini")
-#     chat_agent = ChatGoogleGenerativeAI(
-#         model="gemini-1.5-flash-latest",
-#         version="v1",
-#         google_api_key=os.getenv("GOOGLE_API_KEY")
-#     )
-# else:
-#     print("Using OpenAI")
-#     chat_agent = ChatOpenAI(
-#         model="gpt-4o-mini",
-#         openai_api_key="dummy",
-#         openai_api_base="https://k7uffyg03f.execute-api.us-east-1.amazonaws.com/prod/openai/v1",
-#         default_headers={"x-api-key": os.getenv('API_GATEWAY_KEY')}
-#     )
-
 from assignment_chat.load_science_data import load_science_facts
 import chromadb
 
-# Auto-initialize ChromaDB collections if empty
+# Local Persistence Mode
 def initialize_chromadb():
-    """Check and load ChromaDB collections if needed"""
     try:
-        chroma = chromadb.HttpClient(host="http://localhost:8000")
+        # Get the directory where THIS file (main.py) is located
+        # If main.py is inside assignment_chat, this points there.
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        db_path = os.path.join(base_dir, "chroma_db")
         
-        # Check science_facts collection
-        try:
-            collection = chroma.get_collection("science_facts")
-            count = collection.count()
-            
-            if count == 0:
-                print("Science facts collection is empty. Loading data...")
-                load_science_facts()
-            else:
-                print(f"Science facts loaded: {count} items")
-        except:
-            print("Science facts collection not found. Creating and loading...")
-            load_science_facts()
+        print(f"Checking for holocron at: {db_path}") # Debug line
+        
+        chroma = chromadb.PersistentClient(path=db_path)
+        
+        # This will list what is actually inside that folder
+        collections = [c.name for c in chroma.list_collections()]
+        print(f"Collections found: {collections}")
+        
+        if "science_facts" in collections:
+            count = chroma.get_collection("science_facts").count()
+            print(f"Science holocron active: {count} facts found.")
+        else:
+            print("ERROR: science_facts collection not found in this folder!")
             
     except Exception as e:
-        print(f"ChromaDB initialization warning: {e}")
+        print(f"ChromaDB local check error: {e}")
 
 # Call at startup
 initialize_chromadb()
-
-
 
 from langchain_openai import ChatOpenAI
 chat_agent = ChatOpenAI(
@@ -90,7 +63,7 @@ chat_agent = ChatOpenAI(
 )
 
 
-tools = [get_advice, recommend_albums,recommend_game, get_science_fact]  # adding tools here 
+tools = [get_advice, recommend_game, get_science_fact]  # adding tools here 
 
 instructions = return_instructions()
 
@@ -159,7 +132,7 @@ if __name__ == "__main__":
             "Tell me some advice",
             "Tell me an interesting science misconception",
             "What is the top game deal you can find for me right now?",
-            "What are adventure games you can recommend that are on sale right now?",
+            "What are batman games you can recommend that are on sale right now?",
         ],
         theme=gr.themes.Soft(),
     )
